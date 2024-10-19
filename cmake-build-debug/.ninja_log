@@ -1,0 +1,5 @@
+# ninja log v6
+3	683	7508896255741204	CMakeFiles/something.dir/main.c.obj	5f7245cae2a110b3
+683	764	7508896262541188	something.exe	e6735a3b7c2830d7
+1	186	7508842648258064	build.ninja	cd093b852a6d1b27
+13	126	7505345618760046	CMakeFiles/something.dir/queue.c.obj	c454200738d1b718
