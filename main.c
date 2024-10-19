@@ -11,6 +11,8 @@
 #define BOARD_START 100
 #define BOARD_WIDTH 800
 
+void levelUp();
+
 typedef struct
 {
 
@@ -20,7 +22,7 @@ typedef struct
 {
     int x, y;
     float dx, dy;
-    float speed;
+    float step_size;
     int level;
     Queue* body;
 } Snake;
@@ -32,10 +34,18 @@ typedef struct
 
 typedef struct
 {
+    int x, y;
+} Food;
+
+typedef struct
+{
     Snake snake;
+    Food food;
     bool paused;
     bool gameover;
     bool started;
+    int tick_rate;
+    int score;
 } GameState;
 
 GameState state;
@@ -54,6 +64,21 @@ void renderBitmapString(float x, float y, void *font, const char *string) {
         glutBitmapCharacter(font, *string);  // Render each character
         string++;
     }
+}
+
+bool check_overlap(double x1, double y1, double s1, double x2, double y2, double s2) {
+    // Calculate the right and top edges of both squares
+    double right1 = x1 + s1;  // Right edge of square 1
+    double top1 = y1 + s1;    // Top edge of square 1
+    double right2 = x2 + s2;  // Right edge of square 2
+    double top2 = y2 + s2;    // Top edge of square 2
+
+    // Check for no overlap condition
+    if (x1 >= right2 || x2 >= right1 || y1 >= top2 || y2 >= top1) {
+        return false;  // No overlap
+    }
+
+    return true;  // Overlap
 }
 
 bool checkWallCollision()
@@ -86,15 +111,39 @@ bool checkSnakeCollision()
 
         SegmentPosition* segmentPosition = snakeNode->data;
 
-        if(tail->x == segmentPosition->x && tail->y == segmentPosition->y)
+        if(check_overlap(segmentPosition->x, segmentPosition->y, 10, tail->x, tail->y, 10))
         {
             return true;
         }
+
+        // if(tail->x == segmentPosition->x && tail->y == segmentPosition->y)
+        // {
+        //     return true;
+        // }
 
         snakeNode = snakeNode->next;
     }
 
     return false;
+}
+
+bool checkFoodCollision()
+{
+    Node* node = state.snake.body->tail;
+    SegmentPosition* segment = node->data;
+
+    return check_overlap(segment->x, segment->y, 10, state.food.x, state.food.y, 10);
+}
+
+int random(int min, int max)
+{
+    return rand() % (max + 1 - min) + min;
+}
+
+void spawnFood()
+{
+    state.food.x = random(BOARD_START + 10, BOARD_WIDTH + BOARD_START - 10);
+    state.food.y = random(BOARD_START + 10, BOARD_WIDTH + BOARD_START - 10);
 }
 
 bool checkCollision()
@@ -120,34 +169,51 @@ void updateGame() {
         return;
     }
 
+    if(checkFoodCollision())
+    {
+        levelUp();
+        spawnFood();
+    }
+
     state.snake.x = state.snake.x + state.snake.dx;
     state.snake.y = state.snake.y + state.snake.dy;
 
     SegmentPosition* segment = (SegmentPosition*)malloc(sizeof(SegmentPosition));
-    segment->x = state.snake.x +50;
+    segment->x = state.snake.x;
     segment->y = state.snake.y;
 
     pushQueue(state.snake.body, segment);
     popQueue(state.snake.body);
 }
 
+void renderFood()
+{
+    glBegin(GL_QUADS);
+    glColor3f(0.0, 1.0, 0.0);
+    glVertex2f(state.food.x, state.food.y);
+    glVertex2f(state.food.x + 10, state.food.y);
+    glVertex2f(state.food.x + 10, state.food.y + 10);
+    glVertex2f(state.food.x, state.food.y+ 10);
+    glEnd();
+}
+
 void renderSnake()
 {
+    glBegin(GL_QUADS);
     Node* node = state.snake.body->head;
 
     while (node != NULL)
     {
         SegmentPosition *segment = (SegmentPosition*)node->data;
-        glBegin(GL_QUADS);
         glColor3f(1.0, 0.0, 0.0);
         glVertex2f(segment->x, segment->y);
         glVertex2f(segment->x + 10, segment->y);
         glVertex2f(segment->x + 10, segment->y + 10);
         glVertex2f(segment->x, segment->y + 10);
-        glEnd();
-
         node = node->next;
     }
+
+    glEnd();
 }
 
 void renderWalls()
@@ -156,8 +222,8 @@ void renderWalls()
     glBegin(GL_LINES);
     glColor3f(1.0, 1.0, 1.0);
 
-    glVertex2d(100, 100);  // Adjusted to NDC
-    glVertex2d(900, 100);   // Adjusted to NDC
+    glVertex2d(100, 100);
+    glVertex2d(900, 100);
 
     glVertex2d(900, 100);
     glVertex2d(900, 900);
@@ -172,11 +238,17 @@ void renderWalls()
 
 void render() {
     // This function is called to render graphics
-    glClearColor(0, 0, 0, 1);  // Set background color to black
-    glClear(GL_COLOR_BUFFER_BIT);  // Clear the color buffer
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    char* score = (char*)malloc(sizeof(char) * 20);
+    sprintf(score, "Score: %d", state.score);
+    renderBitmapString(10, 50, GLUT_BITMAP_HELVETICA_12, "SPACE to start");
+    renderBitmapString(10, 70, GLUT_BITMAP_HELVETICA_12, "R to restart");
+    renderBitmapString(900, 50, GLUT_BITMAP_HELVETICA_18, score);
 
     renderWalls();
     renderSnake();
+    renderFood();
     if(state.gameover)
     {
         renderBitmapString(500, 50, GLUT_BITMAP_HELVETICA_18, "GAME OVER");
@@ -193,21 +265,23 @@ void display() {
 void timer(int value) {
     static double previous = 0.0;
     static double lag = 0.0;
+    static double tickLag = 0.0;
 
     double current = getCurrentTime();
     double elapsed = current - previous;
     previous = current;
     lag += elapsed;
+    tickLag += elapsed;
 
-    while (lag >= MS_PER_FRAME) {
+    while (tickLag >= state.tick_rate) {
         updateGame();
-        lag -= MS_PER_FRAME;
+        tickLag -= state.tick_rate;
     }
 
     display();  // Call the display function to render the updated frame
 
     // Call the timer function again after the defined interval
-    glutTimerFunc(16, timer, 0);  // 16 ms for ~60 FPS
+    glutTimerFunc(MS_PER_FRAME, timer, 0);  // 16 ms for ~60 FPS
 }
 
 void initGameState(GameState* state)
@@ -217,14 +291,27 @@ void initGameState(GameState* state)
         return;
     }
 
+    state->score = 0;
+    state->snake.dx = state->snake.step_size;
+    state->snake.dy = 0;
+    state->tick_rate = 80; // every 100ms
     state->paused = false;
     state->gameover = false;
     state->snake.x = 500;
     state->snake.y = 500;
-    state->snake.speed = 3;
+    state->snake.step_size = 10;
     state->snake.level = 5;
     state->snake.body = initQueue();
 
+    SegmentPosition* segment = malloc(sizeof(SegmentPosition));
+
+    state->snake.dx = state->snake.step_size;
+    segment->x = state->snake.x;
+    segment->y = state->snake.y;
+
+    pushQueue(state->snake.body, segment);
+
+    spawnFood();
 }
 
 void restart()
@@ -236,9 +323,22 @@ void levelUp()
 {
     SegmentPosition* segment = malloc(sizeof(SegmentPosition));
 
-    segment->x = state.snake.x + 1;
-    segment->y = state.snake.y;
+    SegmentPosition* tail = state.snake.body->tail->data;
+
+    if(state.snake.body->head->next == NULL)
+    {
+        segment->x = tail->x + -state.snake.dx;
+        segment->y = tail->y + -state.snake.dy;
+    } else
+    {
+        segment->x = tail->x;
+        segment->y = tail->y;
+    }
+
     pushQueue(state.snake.body, segment);
+
+    state.tick_rate -= 3;
+    state.score += 10;
 }
 
 void pause()
@@ -248,34 +348,6 @@ void pause()
 
 void start()
 {
-    SegmentPosition* segment = malloc(sizeof(SegmentPosition));
-    SegmentPosition* segment2 = malloc(sizeof(SegmentPosition));
-    SegmentPosition* segment3 = malloc(sizeof(SegmentPosition));
-    SegmentPosition* segment4 = malloc(sizeof(SegmentPosition));
-
-    state.snake.dx = state.snake.speed;
-    segment->x = state.snake.x;
-    segment->y = state.snake.y;
-
-    segment2->x = state.snake.x + 10;
-    segment2->y = state.snake.y;
-
-    segment3->x = state.snake.x + 20;
-    segment3->y = state.snake.y;
-
-    segment4->x = state.snake.x + 30;
-    segment4->y = state.snake.y;
-
-
-
-    // segment2.x = state->snake.x + 10;
-    // segment2.y = state->snake.y;
-    pushQueue(state.snake.body, segment);
-    pushQueue(state.snake.body, segment2);
-    pushQueue(state.snake.body, segment3);
-    pushQueue(state.snake.body, segment4);
-    // pushQueue(state->snake.body, &segment2);
-
     state.started = true;
 }
 
@@ -287,7 +359,7 @@ void keyboard(unsigned char key, int x, int y) {
             return;
         }
         state.snake.dx = 0;
-        state.snake.dy = -state.snake.speed;
+        state.snake.dy = -state.snake.step_size;
         break;
     case 's': // Move down
         if(state.snake.dy < 0)
@@ -295,14 +367,14 @@ void keyboard(unsigned char key, int x, int y) {
             return;
         }
         state.snake.dx = 0;
-        state.snake.dy = state.snake.speed;
+        state.snake.dy = state.snake.step_size;
         break;
     case 'a': // Move left
         if(state.snake.dx > 0)
         {
             return;
         }
-        state.snake.dx = -state.snake.speed;
+        state.snake.dx = -state.snake.step_size;
         state.snake.dy = 0;
         break;
     case 'd': // Move right
@@ -310,7 +382,7 @@ void keyboard(unsigned char key, int x, int y) {
         {
             return;
         }
-        state.snake.dx = state.snake.speed;
+        state.snake.dx = state.snake.step_size;
         state.snake.dy = 0;
         break;
     case 'x':

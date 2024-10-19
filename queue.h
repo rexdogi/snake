@@ -11,8 +11,7 @@ typedef struct {
     Node *tail;
 } Queue;
 
-// Declaration of functions
-Queue* initQueue();  // Ensure no 'extern' keyword is here
+Queue* initQueue();
 void pushQueue(Queue *queue, void *data);
 void popQueue(Queue *queue);
 

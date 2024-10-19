@@ -3,6 +3,8 @@ project(something C)
 
 set(CMAKE_C_STANDARD 11)
 
+set(SOURCE_FILES main.c)
+
 # Create the executable
 add_executable(something main.c
         queue.c)
