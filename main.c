@@ -10,6 +10,7 @@
 
 #define BOARD_START 100
 #define BOARD_WIDTH 800
+#define CLOCK_MONOTONIC 0
 
 void levelUp();
 
@@ -49,6 +50,25 @@ typedef struct
 } GameState;
 
 GameState state;
+
+int clock_gettime(int clock_id, struct timespec *spec) {
+    static LARGE_INTEGER frequency;
+    static BOOL initialized = FALSE;
+    LARGE_INTEGER count;
+
+    if (!initialized) {
+        QueryPerformanceFrequency(&frequency);  // Get ticks per second
+        initialized = TRUE;
+    }
+
+    QueryPerformanceCounter(&count);  // Get current tick count
+
+    // Convert ticks to seconds and nanoseconds
+    spec->tv_sec = count.QuadPart / frequency.QuadPart;
+    spec->tv_nsec = (long)((count.QuadPart % frequency.QuadPart) * 1e9 / frequency.QuadPart);
+
+    return 0;
+}
 
 double getCurrentTime() {
     struct timespec now;
@@ -386,7 +406,7 @@ void keyboard(unsigned char key, int x, int y) {
         state.snake.dy = 0;
         break;
     case 'x':
-        levelUp();
+        // levelUp();
         break;
     case 'p':
         pause();

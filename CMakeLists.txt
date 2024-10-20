@@ -10,4 +10,4 @@ add_executable(something main.c
         queue.c)
 
 # Link the executable with GLFW and OpenGL
-target_link_libraries(something -lOpenGL32 -lfreeGLUT)
+target_link_libraries(something -lOpenGL32 -lfreeGLUT -static -static-libgcc)

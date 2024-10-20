@@ -1,3 +1,3 @@
-C:/Users/rex/CLionProjects/something/cmake-build-debug/CMakeFiles/something.dir
-C:/Users/rex/CLionProjects/something/cmake-build-debug/CMakeFiles/edit_cache.dir
-C:/Users/rex/CLionProjects/something/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+C:/Users/rex/CLionProjects/snake/cmake-build-debug/CMakeFiles/something.dir
+C:/Users/rex/CLionProjects/snake/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/rex/CLionProjects/snake/cmake-build-debug/CMakeFiles/rebuild_cache.dir
